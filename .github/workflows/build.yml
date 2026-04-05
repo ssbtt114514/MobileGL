@@ -1,0 +1,179 @@
+name: Build MobileGL
+
+on:
+  push:
+    branches: [ main, master, dev ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  # Linux 构建 (Clang)
+  build-linux-clang:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build clang-15 llvm-15
+          sudo apt-get install -y libvulkan-dev  # Vulkan 开发库
+
+      - name: Initialize glslang
+        run: |
+          cd third_party/glslang
+          python3 update_glslang_sources.py
+
+      - name: Configure with Clang
+        run: |
+          cmake -S . -B build \
+            -G Ninja \
+            -DCMAKE_C_COMPILER=clang-15 \
+            -DCMAKE_CXX_COMPILER=clang++-15 \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --parallel $(nproc)
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobilegl-linux-clang
+          path: build/
+
+  # Linux 构建 (GCC - 仅库，不包含测试)
+  build-linux-gcc:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build gcc-12 g++-12
+          sudo apt-get install -y libvulkan-dev
+
+      - name: Initialize glslang
+        run: |
+          cd third_party/glslang
+          python3 update_glslang_sources.py
+
+      - name: Configure with GCC (禁用测试)
+        run: |
+          cmake -S . -B build \
+            -G Ninja \
+            -DCMAKE_C_COMPILER=gcc-12 \
+            -DCMAKE_CXX_COMPILER=g++-12 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DMOBILEGL_BUILD_TEST=OFF \
+            -DMOBILEGL_BUILD_BENCHMARK=OFF
+
+      - name: Build
+        run: cmake --build build --parallel $(nproc)
+
+  # Windows 构建 (MSVC)
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Initialize glslang
+        run: |
+          cd third_party/glslang
+          python update_glslang_sources.py
+        shell: cmd
+
+      - name: Configure
+        run: cmake -S . -B build -A x64
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobilegl-windows-msvc
+          path: build/Release/
+
+  # macOS 构建
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          brew install cmake ninja llvm
+
+      - name: Initialize glslang
+        run: |
+          cd third_party/glslang
+          python3 update_glslang_sources.py
+
+      - name: Configure
+        run: |
+          cmake -S . -B build \
+            -G Ninja \
+            -DCMAKE_C_COMPILER=$(brew --prefix llvm)/bin/clang \
+            -DCMAKE_CXX_COMPILER=$(brew --prefix llvm)/bin/clang++ \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --parallel $(sysctl -n hw.ncpu)
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobilegl-macos
+          path: build/
+
+  # Android 构建 (交叉编译)
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Android NDK
+        uses: android-actions/setup-android@v3
+        with:
+          ndk-version: r26b
+
+      - name: Initialize glslang
+        run: |
+          cd third_party/glslang
+          python3 update_glslang_sources.py
+
+      - name: Configure for Android
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-24 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DMOBILEGL_BUILD_TEST=OFF \
+            -DMOBILEGL_BUILD_BENCHMARK=OFF
+
+      - name: Build
+        run: cmake --build build --parallel $(nproc)
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobilegl-android-arm64
+          path: build/
