@@ -11,9 +11,7 @@ on:
       - main
       - master
       - dev
-  schedule:       # 每天凌晨 2 点自动触发，支持定时（可选）
-    - cron: '0 2 * * *'
-
+  workflow_dispatch:
 jobs:
   build:
     runs-on: ubuntu-latest
