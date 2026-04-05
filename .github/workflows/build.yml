@@ -1,54 +1,46 @@
 name: Build
 
 on:
-  push:           # 推送时自动触发
-    branches:
-      - main
-      - master
-      - dev
-  pull_request:   # 有 PR 创建或更新时自动触发
-    branches:
-      - main
-      - master
-      - dev
   workflow_dispatch:
+
+env:
+  BUILD_TYPE: Release
+  CCACHE_DIR: /tmp/ccache  # 设置ccache缓存目录
+
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-        with:
-          submodules: true
+    - uses: actions/checkout@main
+      with:
+         submodules: true
 
-      - name: Get CMake
-        uses: lukka/get-cmake@latest
+    # 添加ccache步骤
+    - name: CCache
+      uses: hendrikmuhs/ccache-action@main
+      with:
+        key: ${{ runner.os }}-ndk-${{ env.BUILD_TYPE }}
+        max-size: 1G  # 设置缓存大小，根据需要调整
 
-      - name: Prepare Vulkan SDK
-        uses: humbletim/setup-vulkan-sdk@v1.2.1
-        with:
-          vulkan-query-version: 1.4.304.1
-          vulkan-components: Vulkan-Headers, Vulkan-Loader
-          vulkan-use-cache: true
+    # 将ccache添加到PATH
+    - name: Setup ccache in PATH
+      run: |
+        echo "/usr/lib/ccache" >> $GITHUB_PATH
+        echo "CCACHE_DIR=/tmp/ccache" >> $GITHUB_ENV
+        echo "CCACHE_MAXSIZE=2G" >> $GITHUB_ENV
+    
+    - name: Configure CMake and Build
+      run: bash android_ci_build.bash
+      env:
+        CC: ccache clang
+        CXX: ccache clang++
+        CMAKE_C_COMPILER_LAUNCHER: ccache
+        CMAKE_CXX_COMPILER_LAUNCHER: ccache
 
-      - name: Update glslang external sources
-        working-directory: ${{github.workspace}}/3rdparty/glslang
-        run: python update_glslang_sources.py
-
-      - name: Install clang-20
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang-20 clang++-20 lld-20 libc++-20-dev libc++abi-20-dev libvulkan-dev
-
-      - name: Show installed toolchain
-        run: |
-          clang-20 --version
-          clang++-20 --version
-          ld.lld-20 --version || ld.lld --version || true
-
-      - name: Configure with CMake
-        run: cmake -S . -B build -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build
-        run: cmake --build build
+    - name: Upload build output
+      uses: actions/upload-artifact@main
+      with:
+        name: MobileGL
+        path: |
+              **/libMobileGL.so
