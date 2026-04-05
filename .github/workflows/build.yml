@@ -1,11 +1,18 @@
 name: Build
 
 on:
-  push:
+  push:           # 推送时自动触发
     branches:
       - main
       - master
       - dev
+  pull_request:   # 有 PR 创建或更新时自动触发
+    branches:
+      - main
+      - master
+      - dev
+  schedule:       # 每天凌晨 2 点自动触发，支持定时（可选）
+    - cron: '0 2 * * *'
 
 jobs:
   build:
