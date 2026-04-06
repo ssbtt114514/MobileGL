@@ -17,41 +17,39 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo+submodules
+      - name: Checkout repo and submodules
         uses: actions/checkout@v4
         with:
           submodules: true
 
-      - name: Get CMake
-        uses: lukka/get-cmake@latest
-
-      - name: Prepare Vulkan SDK
-        uses: humbletim/setup-vulkan-sdk@v1.2.1
-        with:
-          vulkan-query-version: 1.4.304.1
-          vulkan-components: Vulkan-Headers, Vulkan-Loader
-          vulkan-use-cache: true
-
-      - name: Update glslang external sources
-        working-directory: ${{github.workspace}}/3rdparty/glslang
-        run: python update_glslang_sources.py
-
-      - name: Install clang-20, ninja, vulkan-dev
+      - name: Install dependencies (clang, ninja, vulkan)
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-20 clang++-20 lld-20 libc++-20-dev libc++abi-20-dev libvulkan-dev ninja-build
+          sudo apt-get install -y clang-20 clang++-20 lld-20 libc++-20-dev libc++abi-20-dev libvulkan-dev ninja-build python3
 
-      - name: Show installed toolchain
+      - name: Prepare Vulkan SDK
+        run: |
+          wget -q https://sdk.lunarg.com/sdk/download/1.3.280.0/linux/vulkansdk-linux-x86_64-1.3.280.0.tar.xz
+          tar -xf vulkansdk-linux-x86_64-1.3.280.0.tar.xz
+          export VULKAN_SDK=${GITHUB_WORKSPACE}/1.3.280.0/x86_64
+          echo "VULKAN_SDK=${VULKAN_SDK}" >> $GITHUB_ENV
+
+      - name: Update glslang external sources
+        run: |
+          cd 3rdparty/glslang
+          python3 update_glslang_sources.py
+
+      - name: Show toolchain versions
         run: |
           clang-20 --version
           clang++-20 --version
           ninja --version
           ld.lld-20 --version || ld.lld --version || true
 
-      - name: Configure (CMake)
+      - name: Configure CMake
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20
 
-      - name: Build
+      - name: Build with CMake
         run: |
           cmake --build build
