@@ -1,56 +1,49 @@
-name: Build
+name: Build MobileGL
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - main
-      - master
-      - dev
+    branches: [ main, master ]
   pull_request:
-    branches:
-      - main
-      - master
-      - dev
+    branches: [ main, master ]
+  workflow_dispatch:
+
+env:
+  # 强制使用 Node.js 24 以避免弃用警告
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    
     steps:
-      - name: Checkout repo and submodules
-        uses: actions/checkout@v4
-        with:
-          submodules: true
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
 
-      - name: Install dependencies (clang, ninja, vulkan)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang-20 clang++-20 lld-20 libc++-20-dev libc++abi-20-dev libvulkan-dev ninja-build python3
+    - name: Initialize submodules
+      run: |
+        git submodule update --init --recursive
 
-      - name: Prepare Vulkan SDK
-        run: |
-          wget -q https://sdk.lunarg.com/sdk/download/1.3.280.0/linux/vulkansdk-linux-x86_64-1.3.280.0.tar.xz
-          tar -xf vulkansdk-linux-x86_64-1.3.280.0.tar.xz
-          export VULKAN_SDK=${GITHUB_WORKSPACE}/1.3.280.0/x86_64
-          echo "VULKAN_SDK=${VULKAN_SDK}" >> $GITHUB_ENV
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake ninja-build clang
 
-      - name: Update glslang external sources
-        run: |
-          cd 3rdparty/glslang
-          python3 update_glslang_sources.py
+    - name: Configure CMake with Clang
+      run: |
+        cmake -S . -B build -G Ninja \
+          -DCMAKE_C_COMPILER=clang \
+          -DCMAKE_CXX_COMPILER=clang++ \
+          -DCMAKE_BUILD_TYPE=Release
 
-      - name: Show toolchain versions
-        run: |
-          clang-20 --version
-          clang++-20 --version
-          ninja --version
-          ld.lld-20 --version || ld.lld --version || true
+    - name: Build
+      run: cmake --build build --parallel
 
-      - name: Configure CMake
-        run: |
-          cmake -S . -B build -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20
-
-      - name: Build with CMake
-        run: |
-          cmake --build build
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: mobilegl-build
+        path: build/
+        retention-days: 7
+	
