@@ -1,46 +1,46 @@
-name: Build MobileGL
+name: Build
 
 on:
-  
   workflow_dispatch:
 
 env:
-  # 强制使用 Node.js 24 以避免弃用警告
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  BUILD_TYPE: Release
+  CCACHE_DIR: /tmp/ccache  # 设置ccache缓存目录
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    
+    runs-on: ubuntu-24.04
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+    - uses: actions/checkout@main
       with:
-        submodules: recursive
+         submodules: true
 
-    - name: Initialize submodules
-      run: |
-        git submodule update --init --recursive
-
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake ninja-build clang
-
-    - name: Configure CMake with Clang
-      run: |
-        cmake -S . -B build -G Ninja \
-          -DCMAKE_C_COMPILER=clang \
-          -DCMAKE_CXX_COMPILER=clang++ \
-          -DCMAKE_BUILD_TYPE=Release
-
-    - name: Build
-      run: cmake --build build --parallel
-
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
+    # 添加ccache步骤
+    - name: CCache
+      uses: hendrikmuhs/ccache-action@main
       with:
-        name: mobilegl-build
-        path: build/
-        retention-days: 7
-	
+        key: ${{ runner.os }}-ndk-${{ env.BUILD_TYPE }}
+        max-size: 1G  # 设置缓存大小，根据需要调整
+
+    # 将ccache添加到PATH
+    - name: Setup ccache in PATH
+      run: |
+        echo "/usr/lib/ccache" >> $GITHUB_PATH
+        echo "CCACHE_DIR=/tmp/ccache" >> $GITHUB_ENV
+        echo "CCACHE_MAXSIZE=2G" >> $GITHUB_ENV
+    
+    - name: Configure CMake and Build
+      run: bash android_ci_build.bash
+      env:
+        CC: ccache clang
+        CXX: ccache clang++
+        CMAKE_C_COMPILER_LAUNCHER: ccache
+        CMAKE_CXX_COMPILER_LAUNCHER: ccache
+
+    - name: Upload build output
+      uses: actions/upload-artifact@main
+      with:
+        name: MobileGL
+        path: |
+              **/libMobileGL.so
