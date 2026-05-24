@@ -41,6 +41,11 @@ namespace MobileGL::MG_Backend::DirectVulkan {
     const VertexInputStateFactory::BackendVertexInputState& VertexInputStateFactory::GetOrCreateVertexInputState(
         const MG_State::GLState::VertexArrayObject& vao) {
         const HashType hash = ComputeHash(vao);
+        return GetOrCreateVertexInputState(vao, hash);
+    }
+
+    const VertexInputStateFactory::BackendVertexInputState& VertexInputStateFactory::GetOrCreateVertexInputState(
+        const MG_State::GLState::VertexArrayObject& vao, HashType hash) {
         auto it = m_cache.find(hash);
         if (it != m_cache.end()) {
             return it->second;
@@ -148,8 +153,7 @@ namespace MobileGL::MG_Backend::DirectVulkan {
         case DataType::Int16:
             switch (size) {
             case 1:
-                return isInteger ? VK_FORMAT_R16_SINT
-                                 : (normalized ? VK_FORMAT_R16_SNORM : VK_FORMAT_R16_SSCALED);
+                return isInteger ? VK_FORMAT_R16_SINT : (normalized ? VK_FORMAT_R16_SNORM : VK_FORMAT_R16_SSCALED);
             case 2:
                 return isInteger ? VK_FORMAT_R16G16_SINT
                                  : (normalized ? VK_FORMAT_R16G16_SNORM : VK_FORMAT_R16G16_SSCALED);
@@ -164,8 +168,7 @@ namespace MobileGL::MG_Backend::DirectVulkan {
         case DataType::Uint16:
             switch (size) {
             case 1:
-                return isInteger ? VK_FORMAT_R16_UINT
-                                 : (normalized ? VK_FORMAT_R16_UNORM : VK_FORMAT_R16_USCALED);
+                return isInteger ? VK_FORMAT_R16_UINT : (normalized ? VK_FORMAT_R16_UNORM : VK_FORMAT_R16_USCALED);
             case 2:
                 return isInteger ? VK_FORMAT_R16G16_UINT
                                  : (normalized ? VK_FORMAT_R16G16_UNORM : VK_FORMAT_R16G16_USCALED);
@@ -180,8 +183,7 @@ namespace MobileGL::MG_Backend::DirectVulkan {
         case DataType::Int8:
             switch (size) {
             case 1:
-                return isInteger ? VK_FORMAT_R8_SINT
-                                 : (normalized ? VK_FORMAT_R8_SNORM : VK_FORMAT_R8_SSCALED);
+                return isInteger ? VK_FORMAT_R8_SINT : (normalized ? VK_FORMAT_R8_SNORM : VK_FORMAT_R8_SSCALED);
             case 2:
                 return isInteger ? VK_FORMAT_R8G8_SINT
                                  : (normalized ? VK_FORMAT_R8G8_SNORM : VK_FORMAT_R8G8_SSCALED);
@@ -196,8 +198,7 @@ namespace MobileGL::MG_Backend::DirectVulkan {
         case DataType::Uint8:
             switch (size) {
             case 1:
-                return isInteger ? VK_FORMAT_R8_UINT
-                                 : (normalized ? VK_FORMAT_R8_UNORM : VK_FORMAT_R8_USCALED);
+                return isInteger ? VK_FORMAT_R8_UINT : (normalized ? VK_FORMAT_R8_UNORM : VK_FORMAT_R8_USCALED);
             case 2:
                 return isInteger ? VK_FORMAT_R8G8_UINT
                                  : (normalized ? VK_FORMAT_R8G8_UNORM : VK_FORMAT_R8G8_USCALED);
