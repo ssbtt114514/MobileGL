@@ -47,19 +47,64 @@ jobs:
         run: python update_glslang_sources.py
 
       - name: Build plugin APK
-        run: gradle --no-daemon -p android-plugin :app:assembleRelease
+        id: build
+        run: |
+          cd android-plugin
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease --stacktrace
         env:
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
 
+      - name: Debug - List build outputs
+        if: always()
+        run: |
+          echo "Current directory: $(pwd)"
+          echo "=== Searching for APK files ==="
+          find . -name "*.apk" -type f
+          echo "=== Checking expected path ==="
+          ls -la android-plugin/app/build/outputs/apk/release/ 2>/dev/null || echo "Path not found"
+          ls -la android-plugin/build/outputs/apk/release/ 2>/dev/null || echo "Alternative path not found"
+          echo "=== Gradle build outputs ==="
+          ls -la android-plugin/app/build/outputs/ 2>/dev/null || echo "No outputs directory"
+
       - name: Verify signed APK
         run: |
+          # Find the APK file dynamically
+          APK_FILE=$(find android-plugin -name "app-release.apk" -type f | head -n 1)
+          
+          if [ -z "$APK_FILE" ]; then
+            echo "❌ Error: APK file not found!"
+            echo "Build may have failed or APK path is different."
+            exit 1
+          fi
+          
+          echo "✅ Found APK at: $APK_FILE"
+          
+          # Find apksigner
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
-          "$APKSIGNER" verify --verbose android-plugin/app/build/outputs/apk/release/app-release.apk
+          
+          if [ -z "$APKSIGNER" ]; then
+            echo "❌ Error: apksigner not found!"
+            exit 1
+          fi
+          
+          echo "Using apksigner: $APKSIGNER"
+          
+          # Verify the APK
+          "$APKSIGNER" verify --verbose "$APK_FILE"
+          
+          if [ $? -eq 0 ]; then
+            echo "✅ APK verification successful!"
+          else
+            echo "❌ APK verification failed!"
+            exit 1
+          fi
 
       - name: Upload plugin APK
         uses: actions/upload-artifact@v4
         with:
           name: MobileGL-plugin-${{ env.date_today }}-${{ env.short_sha }}
-          path: android-plugin/app/build/outputs/apk/release/app-release.apk
+          path: android-plugin/**/app-release.apk
+          if-no-files-found: error
